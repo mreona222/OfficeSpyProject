@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
 
+using UnityEngine.UI;
+
 namespace Enemies
 {
     public class EnemyMover : MonoBehaviour
@@ -33,6 +35,9 @@ namespace Enemies
         }
         public bool isArresting => currentState == State.Arresting;
 
+        // LookAroundアニメーション用
+        public int _enemyLookAroundAnimation = 0;
+
         // NavMeshAgent
         NavMeshAgent _enemyNavMeshAgent;
 
@@ -47,9 +52,9 @@ namespace Enemies
         private float _waitAFewSecounds = 0f;
 
         // プレイヤーの捜索
-        RaycastHit[] _playerHit;
-        RaycastHit[] _somethingNoticeHit;
-        int _playerMask = 1 << 6;
+        RaycastHit[] _playerHit = new RaycastHit[6];
+        RaycastHit[] _somethingNoticeHit = new RaycastHit[6];
+
         float _catchOutDistance = 3.0f;
         float _warnDistance = 5.0f;
 
@@ -66,29 +71,50 @@ namespace Enemies
                 case State.LookAround:
                     {
                         // 辺りを見渡す
-                        if (_waitAFewSecounds < 3.0f)
+                        if (_waitAFewSecounds < 0.6f)
                         {
+                            this.transform.Rotate(90.0f * Time.deltaTime * new Vector3(0, 1.0f, 0));
+                            _enemyLookAroundAnimation = 1;
+                            _waitAFewSecounds += Time.deltaTime;
+                        }
+                        else if (_waitAFewSecounds < 1.2f)
+                        {
+                            _enemyLookAroundAnimation = 0;
+                            _waitAFewSecounds += Time.deltaTime;
+                        }
+                        else if (_waitAFewSecounds < 2.4f)
+                        {
+                            _enemyLookAroundAnimation = -1;
+                            this.transform.Rotate(90.0f * Time.deltaTime * new Vector3(0, -1.0f, 0));
+                            _waitAFewSecounds += Time.deltaTime;
+                        }
+                        else if (_waitAFewSecounds < 3.0f)
+                        {
+                            _enemyLookAroundAnimation = 0;
                             _waitAFewSecounds += Time.deltaTime;
                         }
                         // 何も見つけられなければ歩き出す
                         else
                         {
+                            _enemyLookAroundAnimation = 0;
                             Walk();
                         }
                         // 何か気になれば警戒状態
                         if (SomethingNotice())
                         {
+                            _enemyLookAroundAnimation = 0;
                             _enemyNavMeshAgent.speed = 0;
                             Warn();
                         }
                         // プレイヤーを見つける
                         if (PlayerFinder())
                         {
+                            _enemyLookAroundAnimation = 0;
                             _enemyNavMeshAgent.speed = 0;
                             CatchOut();
                         }
-
-                    }break;
+                    }
+                    break;
                 case State.Walking:
                     {
                         // 目標地点に到達したら辺りを見回す
@@ -108,21 +134,22 @@ namespace Enemies
                             _enemyNavMeshAgent.speed = 0;
                             CatchOut();
                         }
-                    }break;
+                    }
+                    break;
                 case State.Warning:
                     {
                         // 気になる場所を捜索する
-                        if (_waitAFewSecounds < 0.5f)
+                        if (_waitAFewSecounds < 1.0f)
                         {
-                            if (_waitAFewSecounds == 0f) {
+                            if (_waitAFewSecounds == 0f)
+                            {
                                 _enemyNavMeshAgent.speed = 0f;
-                                _enemyNavMeshAgent.destination = _somethingNoticeHit[0].point;
                             }
                             _waitAFewSecounds += Time.deltaTime;
                         }
                         else
                         {
-                            _enemyNavMeshAgent.speed = 2.0f;
+                            _enemyNavMeshAgent.speed = 3.0f;
                         }
                         // 辺りを見回す
                         if (_enemyNavMeshAgent.remainingDistance <= _enemyNavMeshAgent.stoppingDistance)
@@ -135,13 +162,17 @@ namespace Enemies
                             _enemyNavMeshAgent.speed = 0;
                             CatchOut();
                         }
-
-                    }break;
+                    }
+                    break;
                 case State.CatchOut:
                     {
                         // 走り始める
                         if (_waitAFewSecounds < 0.5f)
                         {
+                            if (_waitAFewSecounds == 0f)
+                            {
+                                _enemyNavMeshAgent.destination = _playerTransform.position;
+                            }
                             _waitAFewSecounds += Time.deltaTime;
                         }
                         else
@@ -153,19 +184,22 @@ namespace Enemies
                 case State.Running:
                     {
                         // 走る
-                        _enemyNavMeshAgent.speed = 6.0f;
-                        _enemyNavMeshAgent.stoppingDistance = 1.0f;
+                        _enemyNavMeshAgent.speed = 4.5f;
                         _enemyNavMeshAgent.destination = _playerTransform.position;
+                        _enemyNavMeshAgent.stoppingDistance = 1.5f;
                         // プレイヤーを捕まえる
                         if (_enemyNavMeshAgent.remainingDistance <= _enemyNavMeshAgent.stoppingDistance)
                         {
                             Arrest();
                         }
-                    }break;
+                    }
+                    break;
                 case State.Arresting:
                     {
                         _playerTransform.gameObject.GetComponent<Players.PlayerMover>().currentState = Players.PlayerMover.State.Arrested;
                     }
+                    break;
+                default:
                     break;
             }
         }
@@ -187,7 +221,7 @@ namespace Enemies
         {
             // 次のターゲットへ向けて歩く
             _nextTarget++;
-            _enemyNavMeshAgent.SetDestination(_targetTransform.GetChild((_nextTarget) % _targetTransform.childCount).position);
+            _enemyNavMeshAgent.destination = _targetTransform.GetChild((_nextTarget) % _targetTransform.childCount).position;
 
             currentState = State.Walking;
             _waitAFewSecounds = 0f;
@@ -236,11 +270,50 @@ namespace Enemies
         /// <returns></returns>
         private bool PlayerFinder()
         {
-            _playerHit = Physics.SphereCastAll(this.transform.position + Vector3.up * 1.0f, 0.5f, this.transform.forward, _catchOutDistance);
-
-            if (_playerHit.Length == 1)
+            // 1本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 0.7f, 0.3f, this.transform.forward, out _playerHit[0], _catchOutDistance))
             {
                 if (_playerHit[0].transform.gameObject.CompareTag("Player"))
+                {
+                    return true;
+                }
+            }
+            // 2本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 0.7f, 0.3f, Quaternion.AngleAxis(10.0f, Vector3.up) * this.transform.forward, out _playerHit[1], _catchOutDistance))
+            {
+                if (_playerHit[1].transform.gameObject.CompareTag("Player"))
+                {
+                    return true;
+                }
+            }
+            // 3本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 0.7f, 0.3f, Quaternion.AngleAxis(-10.0f, Vector3.up) * this.transform.forward, out _playerHit[2], _catchOutDistance))
+            {
+                if (_playerHit[2].transform.gameObject.CompareTag("Player"))
+                {
+                    return true;
+                }
+            }
+            // 4本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 1.7f, 0.3f, this.transform.forward, out _playerHit[3], _catchOutDistance))
+            {
+                if (_playerHit[3].transform.gameObject.CompareTag("Player"))
+                {
+                    return true;
+                }
+            }
+            // 5本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 1.7f, 0.3f, Quaternion.AngleAxis(10.0f, Vector3.up) * this.transform.forward, out _playerHit[4], _catchOutDistance))
+            {
+                if (_playerHit[4].transform.gameObject.CompareTag("Player"))
+                {
+                    return true;
+                }
+            }
+            // 6本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 1.7f, 0.3f, Quaternion.AngleAxis(-10.0f, Vector3.up) * this.transform.forward, out _playerHit[5], _catchOutDistance))
+            {
+                if (_playerHit[5].transform.gameObject.CompareTag("Player"))
                 {
                     return true;
                 }
@@ -251,12 +324,57 @@ namespace Enemies
 
         private bool SomethingNotice()
         {
-            _somethingNoticeHit = Physics.SphereCastAll(this.transform.position + Vector3.up * 1.0f, 0.5f, this.transform.forward, _warnDistance);
-
-            if (_somethingNoticeHit.Length == 1 && _somethingNoticeHit[0].distance > _catchOutDistance)
+            // 1本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 0.7f, 0.3f, this.transform.forward, out _somethingNoticeHit[0], _warnDistance))
             {
                 if (_somethingNoticeHit[0].transform.gameObject.CompareTag("Player"))
                 {
+                    _enemyNavMeshAgent.destination = _somethingNoticeHit[0].point;
+                    return true;
+                }
+            }
+            // 2本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 0.7f, 0.3f, Quaternion.AngleAxis(10.0f, Vector3.up) * this.transform.forward, out _somethingNoticeHit[1], _warnDistance))
+            {
+                if (_somethingNoticeHit[1].transform.gameObject.CompareTag("Player"))
+                {
+                    _enemyNavMeshAgent.destination = _somethingNoticeHit[1].point;
+                    return true;
+                }
+            }
+            // 3本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 0.7f, 0.3f, Quaternion.AngleAxis(-10.0f, Vector3.up) * this.transform.forward, out _somethingNoticeHit[2], _warnDistance))
+            {
+                if (_somethingNoticeHit[2].transform.gameObject.CompareTag("Player"))
+                {
+                    _enemyNavMeshAgent.destination = _somethingNoticeHit[2].point;
+                    return true;
+                }
+            }
+            // 4本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 1.7f, 0.3f, this.transform.forward, out _somethingNoticeHit[3], _warnDistance))
+            {
+                if (_somethingNoticeHit[3].transform.gameObject.CompareTag("Player"))
+                {
+                    _enemyNavMeshAgent.destination = _somethingNoticeHit[3].point;
+                    return true;
+                }
+            }
+            // 5本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 1.7f, 0.3f, Quaternion.AngleAxis(10.0f, Vector3.up) * this.transform.forward, out _somethingNoticeHit[4], _warnDistance))
+            {
+                if (_somethingNoticeHit[4].transform.gameObject.CompareTag("Player"))
+                {
+                    _enemyNavMeshAgent.destination = _somethingNoticeHit[4].point;
+                    return true;
+                }
+            }
+            // 6本目
+            if (Physics.SphereCast(this.transform.position + Vector3.up * 1.7f, 0.3f, Quaternion.AngleAxis(-10.0f, Vector3.up) * this.transform.forward, out _somethingNoticeHit[5], _warnDistance))
+            {
+                if (_somethingNoticeHit[5].transform.gameObject.CompareTag("Player"))
+                {
+                    _enemyNavMeshAgent.destination = _somethingNoticeHit[5].point;
                     return true;
                 }
             }
@@ -269,12 +387,15 @@ namespace Enemies
 #if UNITY_EDITOR
         private void OnDrawGizmos()
         {
-            //if (_playerHit.Length >= 1)
-            //{
-            //    Gizmos.color = Color.blue;
-            //    Gizmos.DrawRay(this.transform.position + Vector3.up * 1.0f, this.transform.forward * _playerHit[0].distance);
-            //    Gizmos.DrawWireSphere(this.transform.position + Vector3.up * 1.0f + this.transform.forward * _playerHit[0].distance, 0.5f);
-            //}
+            Gizmos.color = Color.blue;
+
+            Gizmos.DrawRay(this.transform.position + Vector3.up * 0.7f, this.transform.forward * _catchOutDistance);
+            Gizmos.DrawRay(this.transform.position + Vector3.up * 0.7f, Quaternion.AngleAxis(10.0f, Vector3.up) * this.transform.forward * _catchOutDistance);
+            Gizmos.DrawRay(this.transform.position + Vector3.up * 0.7f, Quaternion.AngleAxis(-10.0f, Vector3.up) * this.transform.forward * _catchOutDistance);
+
+            Gizmos.DrawRay(this.transform.position + Vector3.up * 1.7f, this.transform.forward * _catchOutDistance);
+            Gizmos.DrawRay(this.transform.position + Vector3.up * 1.7f, Quaternion.AngleAxis(10.0f, Vector3.up) * this.transform.forward * _catchOutDistance);
+            Gizmos.DrawRay(this.transform.position + Vector3.up * 1.7f, Quaternion.AngleAxis(-10.0f, Vector3.up) * this.transform.forward * _catchOutDistance);
         }
 #endif
     }

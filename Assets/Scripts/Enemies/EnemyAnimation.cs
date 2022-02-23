@@ -19,6 +19,8 @@ namespace Enemies
         void Update()
         {
             _enemyAnim.SetInteger("state", (int)_enemyMover.currentState);
+
+            _enemyAnim.SetInteger("lookaround", _enemyMover._enemyLookAroundAnimation);
         }
     }
 }

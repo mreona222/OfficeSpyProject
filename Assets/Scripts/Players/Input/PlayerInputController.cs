@@ -13,6 +13,8 @@ namespace Players {
 
         public bool Crouch { get; set; } = false;
 
+        public bool Interact { get; set; } = false;
+
         void Start()
         {
 
@@ -38,6 +40,12 @@ namespace Players {
         {
             if (context.started) Crouch = true;
             if (context.canceled) Crouch = false;
+        }
+
+        public void OnInteract(InputAction.CallbackContext context)
+        {
+            if (context.started) Interact = true;
+            if (context.canceled) Interact = false;
         }
     }
 }

@@ -14,5 +14,8 @@ namespace Players
 
         // しゃがみ
         public bool Crouch { get; set; }
+
+        // インタラクト
+        public bool Interact { get; set; }
     }
 }
