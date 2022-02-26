@@ -75,6 +75,10 @@ namespace Players
                         {
                             // 何もしない
                         }
+                        if (GameObject.Find("tablet") == null)
+                        {
+                            GameClear();
+                        }
                     }
                     break;
                 case State.Walking:
@@ -167,8 +171,21 @@ namespace Players
                     break;
                 case State.Arrested:
                     {
-
+                        if (UnityEngine.InputSystem.Keyboard.current.rKey.wasPressedThisFrame)
+                        {
+                            UnityEngine.SceneManagement.SceneManager.LoadScene("Test01");
+                        }
                     }
+                    break;
+                case State.GameClear:
+                    {
+                        if (UnityEngine.InputSystem.Keyboard.current.rKey.wasPressedThisFrame)
+                        {
+                            UnityEngine.SceneManagement.SceneManager.LoadScene("Test01");
+                        }
+                    }
+                    break;
+                default:
                     break;
             }
         }
@@ -246,6 +263,11 @@ namespace Players
 
                     }
                     break;
+                case State.GameClear:
+                    {
+                        
+                    }
+                    break;
             }
         }
 
@@ -302,6 +324,13 @@ namespace Players
             currentState = State.Arrested;
         }
 
+        /// <summary>
+        /// ゲームクリア
+        /// </summary>
+        private void GameClear()
+        {
+            currentState = State.GameClear;
+        }
 
         // メソッド--------------------------------------------------------------------------------------------------------------------------------------------------------------------
         /// <summary>

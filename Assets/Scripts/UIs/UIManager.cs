@@ -25,7 +25,7 @@ namespace UIManagers
                     break;
                 case PlayerMover.State.GameClear:
                     {
-
+                        GameObject.Find("Canvas").transform.GetChild(1).gameObject.SetActive(true);
                     }
                     break;
                 default:

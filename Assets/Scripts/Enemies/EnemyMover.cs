@@ -16,7 +16,7 @@ namespace Enemies
             Warning,
             CatchOut,
             Running,
-            Arresting
+            Arresting,
         }
 
         // ó‘Ô‘JˆÚ•Ï”-----------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ namespace Enemies
         RaycastHit[] _somethingNoticeHit = new RaycastHit[6];
 
         float _catchOutDistance = 3.0f;
-        float _warnDistance = 5.0f;
+        float _warnDistance = 4.5f;
 
 
         void Start()
